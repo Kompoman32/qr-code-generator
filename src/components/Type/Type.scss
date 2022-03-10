@@ -3,7 +3,7 @@ div.type {
   flex-direction: column;
   align-items: center;
 
-  width: 500px;
+  width: 100%;
 
   .radio-buttons {
     padding: 10px;
@@ -30,4 +30,42 @@ div.type {
       margin-right: 10px;
     }
   }
+}
+
+$border: 5px solid gray;
+
+.table {
+  display: flex;
+  flex-direction: row;
+
+  width: 100%;
+
+  border: $border;
+  border-right: 0;
+
+  .column {
+    flex: 1 1 0;
+
+    border-right: $border;
+
+    & > label {
+      display: block;
+      width: 100%;
+
+      border-bottom: $border;
+    }
+  }
+}
+
+.correction,
+.masks {
+  display: flex;
+  flex-direction: column;
+
+  align-items: flex-start;
+}
+
+.radio-button-wrapper {
+  display: flex;
+  flex-direction: row;
 }

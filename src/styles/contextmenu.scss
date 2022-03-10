@@ -1,0 +1,54 @@
+.react-contexify {
+  position: absolute;
+
+  background-color: wheat;
+}
+
+.react-contexify__submenu--is-open,
+.react-contexify__submenu--is-open > .react-contexify__item__content {
+}
+
+.react-contexify__submenu--is-open > .react-contexify__submenu {
+}
+
+.react-contexify .react-contexify__submenu {
+}
+
+.react-contexify__submenu-arrow {
+}
+
+.react-contexify__separator {
+}
+
+.react-contexify__will-leave--disabled {
+}
+
+.react-contexify__item {
+  cursor: pointer;
+
+  padding: 5px;
+
+  &:hover {
+    background-color: darken($color: wheat, $amount: 20);
+  }
+
+  &__content {
+    font-size: 10px;
+  }
+}
+
+.react-contexify__item:not(.react-contexify__item--disabled):focus {
+}
+
+.react-contexify__item:not(.react-contexify__item--disabled):hover > .react-contexify__item__content,
+.react-contexify__item:not(.react-contexify__item--disabled):focus > .react-contexify__item__content {
+}
+
+.react-contexify__item:not(.react-contexify__item--disabled):hover > .react-contexify__submenu {
+}
+
+.react-contexify__item--disabled {
+}
+
+.react-contexify__item__content {
+}

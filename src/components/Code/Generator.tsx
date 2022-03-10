@@ -1,16 +1,4 @@
-import { QRCodeCorrectionLevel } from "../CorrectionLevel/CorrectionLevel";
-import { availableDigits, availableLeters, QRCodeType } from "../Type/Type";
-
-export enum QRCodeMask {
-  Zeroed = 0,
-  First = 1,
-  Second = 2,
-  Third = 3,
-  Fourth = 4,
-  Fifth = 5,
-  Sixth = 6,
-  Seventh = 7,
-}
+import { availableDigits, availableLeters, QRCodeType, QRCodeCorrectionLevel, QRCodeMask } from "../Type/Type";
 
 /** https://habr.com/ru/post/172525/ */
 export default class QrCodeGenerator {
@@ -18,7 +6,8 @@ export default class QrCodeGenerator {
     data: string,
     type: QRCodeType,
     correctionLevel: QRCodeCorrectionLevel,
-    mask: QRCodeMask
+    mask: QRCodeMask,
+    addOffset: boolean = true
   ): { version: number; qrCode: boolean[][] } {
     if (type === QRCodeType.Digits) {
       data = data
@@ -45,7 +34,7 @@ export default class QrCodeGenerator {
     );
 
     const combinedArray = QrCodeGenerator_Blocks.getCombinedBlocks(dataBlocks, correctionBlocks);
-    const qrCode = QrCodeGenerator.generateCode(version, correctionLevel, mask, combinedArray);
+    const qrCode = QrCodeGenerator.generateCode(version, correctionLevel, mask, combinedArray, addOffset);
 
     return { version: version + 1, qrCode };
   }
@@ -54,27 +43,15 @@ export default class QrCodeGenerator {
     version: number,
     correctionLevel: QRCodeCorrectionLevel,
     mask: QRCodeMask,
-    data: boolean[]
+    data: boolean[],
+    addOffset: boolean = true
   ): boolean[][] {
     const qrCode = QrCodeGenerator.getQRCodeWithServiceBytes(version, correctionLevel, mask);
     QrCodeGenerator.fillData(qrCode, mask, data);
 
-    const qrCodeSize = qrCode.length;
-
-    qrCode.forEach((x) => {
-      x.unshift(false, false, false, false);
-      x.push(false, false, false, false);
-    });
-
-    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
-    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
-    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
-    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
-
-    qrCode.push(new Array(qrCodeSize + 8).fill(false));
-    qrCode.push(new Array(qrCodeSize + 8).fill(false));
-    qrCode.push(new Array(qrCodeSize + 8).fill(false));
-    qrCode.push(new Array(qrCodeSize + 8).fill(false));
+    if (addOffset) {
+      QrCodeGenerator.addOffset(qrCode);
+    }
 
     return qrCode;
   }
@@ -123,6 +100,7 @@ export default class QrCodeGenerator {
 
     const versionPattern = QrCodeGenerator.getVersionPattern(version);
 
+    // @ts-ignore
     const maskPattern = QrCodeGenerator_Utils.maskCodes[correctionLevel][mask];
 
     const qrCodeSize =
@@ -289,38 +267,58 @@ export default class QrCodeGenerator {
     }
   }
 
+  /* NOT PURE */
+  static addOffset(qrCode: boolean[][]) {
+    const qrCodeSize = qrCode.length;
+
+    qrCode.forEach((x) => {
+      x.unshift(false, false, false, false);
+      x.push(false, false, false, false);
+    });
+
+    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
+    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
+    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
+    qrCode.unshift(new Array(qrCodeSize + 8).fill(false));
+
+    qrCode.push(new Array(qrCodeSize + 8).fill(false));
+    qrCode.push(new Array(qrCodeSize + 8).fill(false));
+    qrCode.push(new Array(qrCodeSize + 8).fill(false));
+    qrCode.push(new Array(qrCodeSize + 8).fill(false));
+  }
+
   static getMaskedValue(mask: QRCodeMask, x: number, y: number, value: boolean): boolean {
     let isInvert = false;
     switch (mask) {
-      case QRCodeMask.Zeroed: {
+      case QRCodeMask.First: {
         isInvert = (x + y) % 2 === 0;
         break;
       }
-      case QRCodeMask.First: {
+      case QRCodeMask.Second: {
         isInvert = y % 2 === 0;
         break;
       }
-      case QRCodeMask.Second: {
+      case QRCodeMask.Third: {
         isInvert = x % 3 === 0;
         break;
       }
-      case QRCodeMask.Third: {
+      case QRCodeMask.Fourth: {
         isInvert = (x + y) % 3 === 0;
         break;
       }
-      case QRCodeMask.Fourth: {
+      case QRCodeMask.Fifth: {
         isInvert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
         break;
       }
-      case QRCodeMask.Fifth: {
+      case QRCodeMask.Sixth: {
         isInvert = ((x * y) % 2) + ((x * y) % 3) === 0;
         break;
       }
-      case QRCodeMask.Sixth: {
+      case QRCodeMask.Seventh: {
         isInvert = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0;
         break;
       }
-      case QRCodeMask.Seventh: {
+      case QRCodeMask.Eighth: {
         isInvert = (((x * y) % 3) + ((x + y) % 2)) % 2 === 0;
         break;
       }
@@ -446,14 +444,14 @@ export default class QrCodeGenerator {
 
     /*-------------- RULE 4 -------------- */
     let filledCount = 0;
-    let unfilledCount = 0;
+    // let unfilledCount = 0;
 
     for (let i = 0; i < size; i++) {
       for (let j = 0; j < size; j++) {
         if (!!code[i][j]) {
           filledCount++;
         } else {
-          unfilledCount++;
+          // unfilledCount++;
         }
       }
     }
@@ -461,6 +459,7 @@ export default class QrCodeGenerator {
     rating += Math.floor((filledCount / (size * size)) * 100 - 50) * 2;
     /*-------------- RULE 4 -------------- */
 
+    /* eslint-disable  @typescript-eslint/no-unused-vars */
     const rule4 = rating - rule3 - rule2 - rule1;
 
     // console.log("Rating Rule #1", rule1);
@@ -651,8 +650,10 @@ export class QrCodeGenerator_Blocks {
   ): number[][] {
     const correctionBlocks: number[][] = [];
 
-    const currentCorrectionBytesCount = QrCodeGenerator_Utils.correctionBytesCount[correctionLevel][version];
-    const currentGeneratingPolynomial = QrCodeGenerator_Utils.generatingPolynomial[currentCorrectionBytesCount];
+    const currentCorrectionBytesCount: number = QrCodeGenerator_Utils.correctionBytesCount[correctionLevel][version];
+    const currentGeneratingPolynomial: number[] =
+      // @ts-ignore
+      QrCodeGenerator_Utils.generatingPolynomial[currentCorrectionBytesCount];
 
     dataBlocks.forEach((dataBlock) => {
       const bytesOfData = dataBlock.length;
@@ -756,73 +757,78 @@ export class QrCodeGenerator_Utils {
     return utf8;
   }
 
+  /* Table 2 */
   static versionSizes = {
-    0: [
+    [QRCodeCorrectionLevel.L]: [
       152, 272, 440, 640, 864, 1088, 1248, 1552, 1856, 2192, 2592, 2960, 3424, 3688, 4184, 4712, 5176, 5768, 6360, 6888,
       7456, 8048, 8752, 9392, 10208, 10960, 11744, 12248, 13048, 13880, 14744, 15640, 16568, 17528, 18448, 19472, 20528,
       21616, 22496, 23648,
     ],
-    1: [
+    [QRCodeCorrectionLevel.M]: [
       128, 224, 352, 512, 688, 864, 992, 1232, 1456, 1728, 2032, 2320, 2672, 2920, 3320, 3624, 4056, 4504, 5016, 5352,
       5712, 6256, 6880, 7312, 8000, 8496, 9024, 9544, 10136, 10984, 11640, 12328, 13048, 13800, 14496, 15312, 15936,
       16816, 17728, 18672,
     ],
-    2: [
+    [QRCodeCorrectionLevel.Q]: [
       104, 176, 272, 384, 496, 608, 704, 880, 1056, 1232, 1440, 1648, 1952, 2088, 2360, 2600, 2936, 3176, 3560, 3880,
       4096, 4544, 4912, 5312, 5744, 6032, 6464, 6968, 7288, 7880, 8264, 8920, 9368, 9848, 10288, 10832, 11408, 12016,
       12656, 13328,
     ],
-    3: [
+    [QRCodeCorrectionLevel.H]: [
       72, 128, 208, 288, 368, 480, 528, 688, 800, 976, 1120, 1264, 1440, 1576, 1784, 2024, 2264, 2504, 2728, 3080, 3248,
       3536, 3712, 4112, 4304, 4768, 5024, 5288, 5608, 5960, 6344, 6760, 7208, 7688, 7888, 8432, 8768, 9136, 9776, 10208,
     ],
   };
 
+  /* Table 3 */
   static maxDataLengthBits = {
-    0: [10, 12, 14],
-    1: [9, 11, 13],
-    2: [8, 16, 16],
+    [QRCodeType.Digits]: [10, 12, 14],
+    [QRCodeType.Letters]: [9, 11, 13],
+    [QRCodeType.Bytes]: [8, 16, 16],
   };
 
+  /* Table 4 */
   static blocksCount = {
-    0: [
+    [QRCodeCorrectionLevel.L]: [
       1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19,
       19, 20, 21, 22, 24, 25,
     ],
-    1: [
+    [QRCodeCorrectionLevel.M]: [
       1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33,
       35, 37, 38, 40, 43, 45, 47, 49,
     ],
-    2: [
+    [QRCodeCorrectionLevel.Q]: [
       1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43,
       45, 48, 51, 53, 56, 59, 62, 65, 68,
     ],
-    3: [
+    [QRCodeCorrectionLevel.H]: [
       1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51,
       54, 57, 60, 63, 66, 70, 74, 77, 81,
     ],
   };
 
+  /* Table 5 */
   static correctionBytesCount = {
-    0: [
+    [QRCodeCorrectionLevel.L]: [
       7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30,
       30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
     ],
-    1: [
+    [QRCodeCorrectionLevel.M]: [
       10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28,
       28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
     ],
-    2: [
+    [QRCodeCorrectionLevel.Q]: [
       13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30,
       30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
     ],
-    3: [
+    [QRCodeCorrectionLevel.H]: [
       17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30,
       30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30,
     ],
   };
 
-  static generatingPolynomial: { [key: number]: number[] } = {
+  /* Table 6 */
+  static generatingPolynomial = {
     7: [87, 229, 146, 149, 238, 102, 21],
     10: [251, 67, 46, 61, 118, 70, 64, 94, 32, 45],
     13: [74, 152, 176, 100, 86, 100, 106, 104, 130, 218, 206, 140, 78],
@@ -849,6 +855,7 @@ export class QrCodeGenerator_Utils {
     ],
   };
 
+  /* Table 7 */
   static galuaField = [
     1, 2, 4, 8, 16, 32, 64, 128, 29, 58, 116, 232, 205, 135, 19, 38, 76, 152, 45, 90, 180, 117, 234, 201, 143, 3, 6, 12,
     24, 48, 96, 192, 157, 39, 78, 156, 37, 74, 148, 53, 106, 212, 181, 119, 238, 193, 159, 35, 70, 140, 5, 10, 20, 40,
@@ -863,6 +870,7 @@ export class QrCodeGenerator_Utils {
     173, 71, 142, 1,
   ];
 
+  /* Table 8 */
   static revertGaluaField = [
     -1, 0, 1, 25, 2, 50, 26, 198, 3, 223, 51, 238, 27, 104, 199, 75, 4, 100, 224, 14, 52, 141, 239, 129, 28, 193, 105,
     248, 200, 8, 76, 113, 5, 138, 101, 47, 225, 36, 15, 33, 53, 147, 142, 218, 240, 18, 130, 69, 29, 181, 194, 125, 106,
@@ -877,6 +885,7 @@ export class QrCodeGenerator_Utils {
     80, 88, 175,
   ];
 
+  /* Table 9 index = version */
   static searchPatternPositions = [
     [],
     [18],
@@ -920,6 +929,7 @@ export class QrCodeGenerator_Utils {
     [6, 30, 58, 86, 114, 142, 170],
   ];
 
+  /* Table 10 index = version - 1 */
   static versionCodes = [
     [],
     [],
@@ -963,46 +973,559 @@ export class QrCodeGenerator_Utils {
     ["111001", "000100", "010101"],
   ];
 
-  static maskCodes: { [key: number]: boolean[][] } = {
-    0: [
-      [true, true, true, false, true, true, true, true, true, false, false, false, true, false, false],
-      [true, true, true, false, false, true, false, true, true, true, true, false, false, true, true],
-      [true, true, true, true, true, false, true, true, false, true, false, true, false, true, false],
-      [true, true, true, true, false, false, false, true, false, false, true, true, true, false, true],
-      [true, true, false, false, true, true, false, false, false, true, false, true, true, true, true],
-      [true, true, false, false, false, true, true, false, false, false, true, true, false, false, false],
-      [true, true, false, true, true, false, false, false, true, false, false, false, false, false, true],
-      [true, true, false, true, false, false, true, false, true, true, true, false, true, true, false],
-    ],
-    1: [
-      [true, false, true, false, true, false, false, false, false, false, true, false, false, true, false],
-      [true, false, true, false, false, false, true, false, false, true, false, false, true, false, true],
-      [true, false, true, true, true, true, false, false, true, true, true, true, true, false, false],
-      [true, false, true, true, false, true, true, false, true, false, false, true, false, true, true],
-      [true, false, false, false, true, false, true, true, true, true, true, true, false, false, true],
-      [true, false, false, false, false, false, false, true, true, false, false, true, true, true, false],
-      [true, false, false, true, true, true, true, true, false, false, true, false, true, true, true],
-      [true, false, false, true, false, true, false, true, false, true, false, false, false, false, false],
-    ],
-    2: [
-      [false, true, true, false, true, false, true, false, true, false, true, true, true, true, true],
-      [false, true, true, false, false, false, false, false, true, true, false, true, false, false, false],
-      [false, true, true, true, true, true, true, false, false, true, true, false, false, false, true],
-      [false, true, true, true, false, true, false, false, false, false, false, false, true, true, false],
-      [false, true, false, false, true, false, false, true, false, true, true, false, true, false, false],
-      [false, true, false, false, false, false, true, true, false, false, false, false, false, true, true],
-      [false, true, false, true, true, true, false, true, true, false, true, true, false, true, false],
-      [false, true, false, true, false, true, true, true, true, true, false, true, true, false, true],
-    ],
-    3: [
-      [false, false, true, false, true, true, false, true, false, false, false, true, false, false, true],
-      [false, false, true, false, false, true, true, true, false, true, true, true, true, true, false],
-      [false, false, true, true, true, false, false, true, true, true, false, false, true, true, true],
-      [false, false, true, true, false, false, true, true, true, false, true, false, false, false, false],
-      [false, false, false, false, true, true, true, false, true, true, false, false, false, true, false],
-      [false, false, false, false, false, true, false, false, true, false, true, false, true, false, true],
-      [false, false, false, true, true, false, true, false, false, false, false, true, true, false, false],
-      [false, false, false, true, false, false, false, false, false, true, true, true, false, true, true],
-    ],
+  /* Table 11 */
+  static maskCodes = {
+    [QRCodeCorrectionLevel.L]: {
+      [QRCodeMask.First]: [
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+      ],
+      [QRCodeMask.Second]: [
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+      ],
+      [QRCodeMask.Third]: [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+      ],
+      [QRCodeMask.Fourth]: [
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+      ],
+      [QRCodeMask.Fifth]: [
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+      ],
+      [QRCodeMask.Sixth]: [
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+      ],
+      [QRCodeMask.Seventh]: [
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+      ],
+      [QRCodeMask.Eighth]: [
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+      ],
+    },
+    [QRCodeCorrectionLevel.M]: {
+      [QRCodeMask.First]: [
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+      ],
+      [QRCodeMask.Second]: [
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+      ],
+      [QRCodeMask.Third]: [
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+      ],
+      [QRCodeMask.Fourth]: [
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+      ],
+      [QRCodeMask.Fifth]: [
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+      ],
+      [QRCodeMask.Sixth]: [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+      ],
+      [QRCodeMask.Seventh]: [
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+      ],
+      [QRCodeMask.Eighth]: [
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ],
+    },
+    [QRCodeCorrectionLevel.Q]: {
+      [QRCodeMask.First]: [
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ],
+      [QRCodeMask.Second]: [
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+      ],
+      [QRCodeMask.Third]: [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+      ],
+      [QRCodeMask.Fourth]: [
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+      ],
+      [QRCodeMask.Fifth]: [
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+      ],
+      [QRCodeMask.Sixth]: [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+      ],
+      [QRCodeMask.Seventh]: [
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+      ],
+      [QRCodeMask.Eighth]: [
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+      ],
+    },
+    [QRCodeCorrectionLevel.H]: {
+      [QRCodeMask.First]: [
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+      ],
+      [QRCodeMask.Second]: [
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+      ],
+      [QRCodeMask.Third]: [
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+      ],
+      [QRCodeMask.Fourth]: [
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+      ],
+      [QRCodeMask.Fifth]: [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+      ],
+      [QRCodeMask.Sixth]: [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+      ],
+      [QRCodeMask.Seventh]: [
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+      ],
+      [QRCodeMask.Eighth]: [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+      ],
+    },
   };
 }
