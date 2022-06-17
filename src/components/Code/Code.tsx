@@ -3,19 +3,23 @@ import "../../styles/contextmenu.scss";
 import React from "react";
 import { QRCodeType, QRCodeCorrectionLevel, QRCodeMask } from "../Type/Type";
 import QrCodeGenerator from "./Generator";
+import { QRCodeStepsProps } from "./Steps";
 
 export type QRCodeProps = {
   type: QRCodeType;
   correctionLevel: QRCodeCorrectionLevel;
   mask: QRCodeMask;
   data: string;
+  version?: number;
+
+  updateInscrutions: (info: QRCodeStepsProps) => void;
 };
 
 export type QRCodeState = {
   useOffset: boolean;
 };
 
-export default class QRCodeComponent extends React.Component<QRCodeProps, QRCodeState> {
+class QRCodeComponent extends React.Component<QRCodeProps, QRCodeState> {
   static MENU_ID = "qrcode-context-menu";
 
   constructor(props: QRCodeProps) {
@@ -28,35 +32,61 @@ export default class QRCodeComponent extends React.Component<QRCodeProps, QRCode
   render() {
     let qrCode: boolean[][] | undefined;
     let version: number | undefined;
-    let mask: QRCodeMask;
+    let mask: QRCodeMask = this.props.mask;
+    let bestMask: QRCodeMask;
 
-    if (this.props.mask === QRCodeMask.Auto) {
+    if (mask === QRCodeMask.Auto) {
       const qrCodes = new Map<QRCodeMask, { version: number; qrCode: boolean[][] }>();
       const ratings: number[] = [];
       for (let i = QRCodeMask.First; i <= QRCodeMask.Eighth; i++) {
-        const result = QrCodeGenerator.generate(this.props.data, this.props.type, this.props.correctionLevel, i, false);
+        const result = QrCodeGenerator.generate(
+          this.props.data,
+          this.props.type,
+          this.props.correctionLevel,
+          i,
+          this.props.version,
+          false
+        );
+        if (result.version < 0) {
+          continue;
+        }
+
         qrCodes.set(i, result);
         ratings[i] = QrCodeGenerator.getMaskRating(result.qrCode);
       }
 
       const bestIndex = ratings.reduce((a, x, ind, arr) => (arr[ind] < arr[a] ? ind : a), QRCodeMask.First);
 
-      version = qrCodes.get(bestIndex)?.version;
-      qrCode = qrCodes.get(bestIndex)?.qrCode;
+      version = qrCodes.get(bestIndex)?.version || -1;
+      qrCode = qrCodes.get(bestIndex)?.qrCode || [[]];
 
-      mask = bestIndex;
+      bestMask = bestIndex;
     } else {
       const result = QrCodeGenerator.generate(
         this.props.data,
         this.props.type,
         this.props.correctionLevel,
-        this.props.mask,
+        mask,
+        this.props.version,
         false
       );
       qrCode = result.qrCode;
       version = result.version;
-      mask = this.props.mask;
+      bestMask = mask;
     }
+
+    setTimeout(() => {
+      this.props.updateInscrutions({
+        type: this.props.type,
+        correctionLevel: this.props.correctionLevel,
+        mask: mask,
+        bestMask: bestMask,
+        version: version || -1,
+        forcedVersion: this.props.version || -1,
+        data: "",
+        originalData: this.props.data,
+      });
+    });
 
     // QrCodeGenerator.addOffset(qrCode as boolean[][]);
 
@@ -111,8 +141,8 @@ export default class QRCodeComponent extends React.Component<QRCodeProps, QRCode
               />
               <label htmlFor="use-offset">Добавить отступ</label>
             </div>
-            <div>Версия{version}</div>
-            <div>Маска {mask}</div>
+            <div>Версия {version}</div>
+            <div>Маска {bestMask}</div>
             <div
               className="save menu left"
               title="Скачать SVG"
@@ -279,3 +309,5 @@ class QRcodeDraw extends React.Component<{ qrCode: boolean[][]; useOffset: boole
     return canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
   }
 }
+
+export default React.memo(QRCodeComponent);

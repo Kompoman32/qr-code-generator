@@ -7,6 +7,7 @@ export default class QrCodeGenerator {
     type: QRCodeType,
     correctionLevel: QRCodeCorrectionLevel,
     mask: QRCodeMask,
+    minVersion?: number,
     addOffset: boolean = true
   ): { version: number; qrCode: boolean[][] } {
     if (type === QRCodeType.Digits) {
@@ -23,7 +24,16 @@ export default class QrCodeGenerator {
         .join("");
     }
 
-    const { outputData, version } = QrCodeGenerator_Data.getGeneratedOutputData(type, correctionLevel, data);
+    const { outputData, version } = QrCodeGenerator_Data.getGeneratedOutputData(
+      type,
+      correctionLevel,
+      data,
+      minVersion || 1
+    );
+
+    if (version < 0) {
+      return { version, qrCode: [[]] };
+    }
 
     const dataBlocks: number[][] = QrCodeGenerator_Blocks.getDataBlocks(correctionLevel, version, outputData);
     const correctionBlocks: number[][] = QrCodeGenerator_Blocks.getCorrectionBlocks(
@@ -475,7 +485,8 @@ export class QrCodeGenerator_Data {
   static getGeneratedOutputData(
     type: QRCodeType,
     correctionLevel: QRCodeCorrectionLevel,
-    data: string
+    data: string,
+    minVersion: number
   ): { outputData: string; version: number } {
     let generatedData: string = "";
     const initialDataLength = data.length;
@@ -485,9 +496,15 @@ export class QrCodeGenerator_Data {
       (x) => x > initialDataLength * (type === QRCodeType.Bytes ? 8 : 1) - 1
     );
 
+    if (minVersion > version) {
+      version = minVersion;
+    }
+
     if (version < 0) {
       version = 0;
     }
+
+    const initialVersion = version;
 
     while (version < 40) {
       generatedData = QrCodeGenerator_Data.addServiceBytes(type, version, data);
@@ -496,6 +513,10 @@ export class QrCodeGenerator_Data {
         break;
       }
       version++;
+    }
+
+    if (version >= 40 || (version === 39 && generatedData.length > availableCorrectionVersions[version])) {
+      return { outputData: generatedData, version: -1 };
     }
 
     if (generatedData.length % 8 > 0) {
@@ -1528,4 +1549,42 @@ export class QrCodeGenerator_Utils {
       ],
     },
   };
+
+  /* Table 12 */
+  static maskFormula = {
+    [QRCodeMask.Auto]: "see Best Mask",
+    [QRCodeMask.First]: "(X+Y) % 2",
+    [QRCodeMask.Second]: "Y % 2",
+    [QRCodeMask.Third]: "X % 3",
+    [QRCodeMask.Fourth]: "(X + Y) % 3",
+    [QRCodeMask.Fifth]: "(X/3 + Y/2) % 2",
+    [QRCodeMask.Sixth]: "(X*Y) % 2 + (X*Y) % 3",
+    [QRCodeMask.Seventh]: "((X*Y) % 2 + (X*Y) % 3) % 2",
+    [QRCodeMask.Eighth]: "((X*Y) % 3 + (X+Y) % 2) % 2",
+  };
+
+  static availableLettersTable() {
+    const tableRows = [];
+
+    for (let i = 0; i < availableLeters.length; i++) {
+      tableRows.push(
+        <tr>
+          <td>{availableLeters[i].replace(" ", "<space>")}</td>
+          <td>{i}</td>
+        </tr>
+      );
+    }
+
+    return (
+      <table>
+        <thead>
+          <tr>
+            <th>Char</th>
+            <th>Encode value</th>
+          </tr>
+        </thead>
+        <tbody>{tableRows}</tbody>
+      </table>
+    );
+  }
 }

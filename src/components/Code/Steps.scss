@@ -1,0 +1,35 @@
+$border: 2px solid gray;
+$cell-border: 1px solid gray;
+
+table {
+  border: $border;
+
+  border-collapse: collapse;
+
+  thead tr th {
+    border: $border;
+
+    padding: 2px;
+
+    background-color: antiquewhite;
+  }
+
+  tbody tr td {
+    border: $cell-border;
+    padding: 2px;
+  }
+}
+
+.tables {
+  display: flex;
+  flex-direction: row;
+
+  align-items: flex-start;
+
+  width: 100%;
+  overflow: auto;
+
+  & > * {
+    margin-right: 10px;
+  }
+}
